@@ -48,7 +48,7 @@ function personnummerOk(v) {
 }
 
 function passwordOk(given) {
-  const expected = process.env.MEMBER_PASSWORD || '';
+  const expected = (process.env.MEMBER_PASSWORD || '').trim();
   const a = Buffer.from(given);
   const b = Buffer.from(expected);
   return expected.length > 0 && a.length === b.length && timingSafeEqual(a, b);
@@ -86,21 +86,35 @@ export default async (req) => {
   if (body.kind === 'kontakt') {
     const fullname = clean(body.fullname, 200);
     const email = clean(body.email, 200);
-    const address = clean(body.address, 500);
+    const street = clean(body.street, 200);
+    const postcode = clean(body.postcode, 10);
+    const city = clean(body.city, 100);
     const source = clean(body.source, 300);
 
-    if (!fullname || !email || !address || !source) {
+    if (!fullname || !email || !street || !postcode || !city || !source) {
       return reply({ ok: false, error: 'missing' }, 400);
     }
     if (!emailOk(email)) return reply({ ok: false, error: 'email' }, 400);
+    if (!postcodeOk(postcode)) return reply({ ok: false, error: 'postcode' }, 400);
 
-    const saved = await toSheet('Kontakt', [fullname, email, address, source]);
+    const saved = await toSheet('Kontakt', [fullname, email, street, postcode, city, source]);
     return saved ? reply({ ok: true }) : reply({ ok: false, error: 'server' }, 502);
   }
 
   // ---- Member form (/medlem): password checked here, on the server ----
   if (body.kind === 'losenord' || body.kind === 'medlem') {
+    // If the variable is missing, the function cannot see it: report a server error, not "wrong password".
+    if (!(process.env.MEMBER_PASSWORD || '').trim()) {
+      return reply({ ok: false, error: 'server' }, 500);
+    }
     if (!passwordOk(clean(body.password, 200))) {
+      // Debug aid: logs only lengths, never the passwords. Visible only in your Netlify function logs.
+      console.log(
+        'Password mismatch. Stored length:',
+        (process.env.MEMBER_PASSWORD || '').trim().length,
+        'Typed length:',
+        clean(body.password, 200).length
+      );
       await wait(1000); // slows down guessing
       return reply({ ok: false, error: 'password' }, 401);
     }

@@ -70,10 +70,26 @@
 
           <label>
             <span class="etikett">
-              <span class="t" lang="sv">Fullständig adress</span>
-              <span class="t" lang="en">Full address</span>
+              <span class="t" lang="sv">Gatuadress</span>
+              <span class="t" lang="en">Street address</span>
             </span>
-            <textarea name="address" rows="3" autocomplete="street-address" required></textarea>
+            <input type="text" name="street" autocomplete="street-address" required />
+          </label>
+
+          <label>
+            <span class="etikett">
+              <span class="t" lang="sv">Postnummer</span>
+              <span class="t" lang="en">Postal code</span>
+            </span>
+            <input type="text" name="postcode" autocomplete="postal-code" inputmode="numeric" required />
+          </label>
+
+          <label>
+            <span class="etikett">
+              <span class="t" lang="sv">Stad</span>
+              <span class="t" lang="en">City</span>
+            </span>
+            <input type="text" name="city" autocomplete="address-level2" required />
           </label>
 
           <label>
@@ -97,6 +113,11 @@
           <p class="fel" id="fel" role="alert" hidden>
             <span class="t" lang="sv">Något gick fel. Försök igen.</span>
             <span class="t" lang="en">Something went wrong. Please try again.</span>
+          </p>
+
+          <p class="fel" id="fel-postnummer" role="alert" hidden>
+            <span class="t" lang="sv">Kontrollera postnumret (5 siffror).</span>
+            <span class="t" lang="en">Please check the postal code (5 digits).</span>
           </p>
         </form>
 
@@ -132,6 +153,7 @@
       // Sends the form to the Netlify function, which saves it in the Google Sheet. Works only on the deployed site.
       const formular = document.querySelector<HTMLFormElement>('#formular');
       const fel = document.querySelector<HTMLElement>('#fel');
+      const felPostnummer = document.querySelector<HTMLElement>('#fel-postnummer');
       const tack = document.querySelector<HTMLElement>('#tack');
       const skicka = document.querySelector<HTMLButtonElement>('.skicka');
 
@@ -139,6 +161,7 @@
         e.preventDefault();
         if (!fel || !tack || !skicka) return;
         fel.hidden = true;
+        if (felPostnummer) felPostnummer.hidden = true;
         skicka.disabled = true;
         try {
           const res = await fetch('/.netlify/functions/skicka', {
@@ -150,11 +173,13 @@
             }),
           });
           const svar = await res.json();
-          if (!svar.ok) throw new Error('bad response');
+          if (!svar.ok) throw new Error(svar.error || 'bad response');
           formular.hidden = true;
           tack.hidden = false;
-        } catch {
-          fel.hidden = false;
+        } catch (err) {
+          const kod = err instanceof Error ? err.message : '';
+          if (kod === 'postcode' && felPostnummer) felPostnummer.hidden = false;
+          else fel.hidden = false;
           skicka.disabled = false;
         }
       });
