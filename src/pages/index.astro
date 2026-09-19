@@ -1,12 +1,385 @@
----
----
-<html lang="en">
+<!doctype html>
+<html lang="sv" data-lang="sv">
   <head>
     <meta charset="utf-8" />
-    <title>My Site</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Thea Sofia</title>
+
+    <!-- Runs before the page is drawn, so the right language shows immediately (no flash). -->
+    <script is:inline>
+      (function () {
+        var lang = null;
+        try { lang = localStorage.getItem('lang'); } catch (e) {}
+        if (lang !== 'sv' && lang !== 'en') {
+          lang = (navigator.language || '').toLowerCase().indexOf('sv') === 0 ? 'sv' : 'en';
+        }
+        document.documentElement.setAttribute('data-lang', lang);
+        document.documentElement.lang = lang;
+      })();
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,300;0,400;1,300&display=swap"
+      rel="stylesheet"
+    />
   </head>
+
   <body>
-    <h1>Hello, world</h1>
-    <p>This is my first Astro page. fuck yeah</p>
+    <div class="sida">
+      <nav class="val" aria-label="Språk / Language">
+        <button type="button" data-set="sv" lang="sv" aria-pressed="true">Svenska</button>
+        <button type="button" data-set="en" lang="en" aria-pressed="false">English</button>
+      </nav>
+
+      <main>
+        <h1 class="dold">Thea Sofia</h1>
+
+        <div class="intro">
+          <p>
+            <span class="t" lang="sv">Thea Sofia är en ideell studentförening i Lund som samlar studenter för annorlunda samtal. Varje möte har ett nytt tema, text och te. En gång i månaden samlas vi för att lekfullt ifrågasätta allt.</span>
+            <span class="t" lang="en">Thea Sofia is a non-profit student association in Lund that brings students together for unconventional conversations. Every meeting has a new theme, a text and tea. Once a month we gather to playfully question everything.</span>
+          </p>
+          <p>
+            <span class="t" lang="sv">För mer info mejla: </span><span class="t" lang="en">For more info, email: </span><a href="mailto:theasofia.lund@gmail.com">theasofia.lund@gmail.com</a>
+          </p>
+        </div>
+
+        <form id="formular" class="formular" method="POST">
+          <p class="dold" aria-hidden="true">
+            <label>Do not fill in: <input name="website" tabindex="-1" autocomplete="off" /></label>
+          </p>
+
+          <label>
+            <span class="etikett">
+              <span class="t" lang="sv">Fullständigt namn</span>
+              <span class="t" lang="en">Full name</span>
+            </span>
+            <input type="text" name="fullname" autocomplete="name" required />
+          </label>
+
+          <label>
+            <span class="etikett">
+              <span class="t" lang="sv">E-post</span>
+              <span class="t" lang="en">Email</span>
+            </span>
+            <input type="email" name="email" autocomplete="email" required />
+          </label>
+
+          <label>
+            <span class="etikett">
+              <span class="t" lang="sv">Fullständig adress</span>
+              <span class="t" lang="en">Full address</span>
+            </span>
+            <textarea name="address" rows="3" autocomplete="street-address" required></textarea>
+          </label>
+
+          <label>
+            <span class="etikett">
+              <span class="t" lang="sv">Var hittade du mig?</span>
+              <span class="t" lang="en">Where did you find me?</span>
+            </span>
+            <input type="text" name="source" required />
+          </label>
+
+          <button type="submit" class="skicka">
+            <span class="t" lang="sv">Skicka</span>
+            <span class="t" lang="en">Send</span>
+          </button>
+
+          <p class="not">
+            <span class="t" lang="sv">Uppgifterna används endast för att kontakta dig.</span>
+            <span class="t" lang="en">Your details are used only to contact you.</span>
+          </p>
+
+          <p class="fel" id="fel" role="alert" hidden>
+            <span class="t" lang="sv">Något gick fel. Försök igen.</span>
+            <span class="t" lang="en">Something went wrong. Please try again.</span>
+          </p>
+        </form>
+
+        <p class="tack" id="tack" role="status" hidden>
+          <span class="t" lang="sv">Tack.</span>
+          <span class="t" lang="en">Thank you.</span>
+        </p>
+      </main>
+    </div>
+
+    <script>
+      type Lang = 'sv' | 'en';
+
+      const root = document.documentElement;
+      const knappar = document.querySelectorAll<HTMLButtonElement>('[data-set]');
+
+      function visa(lang: Lang) {
+        root.setAttribute('data-lang', lang);
+        root.lang = lang;
+        knappar.forEach((k) => k.setAttribute('aria-pressed', String(k.dataset.set === lang)));
+      }
+
+      knappar.forEach((k) =>
+        k.addEventListener('click', () => {
+          const lang = k.dataset.set as Lang;
+          visa(lang);
+          try { localStorage.setItem('lang', lang); } catch {}
+        })
+      );
+
+      visa(root.getAttribute('data-lang') === 'en' ? 'en' : 'sv');
+
+      // Sends the form to the Netlify function, which saves it in the Google Sheet. Works only on the deployed site.
+      const formular = document.querySelector<HTMLFormElement>('#formular');
+      const fel = document.querySelector<HTMLElement>('#fel');
+      const tack = document.querySelector<HTMLElement>('#tack');
+      const skicka = document.querySelector<HTMLButtonElement>('.skicka');
+
+      formular?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!fel || !tack || !skicka) return;
+        fel.hidden = true;
+        skicka.disabled = true;
+        try {
+          const res = await fetch('/.netlify/functions/skicka', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              kind: 'kontakt',
+              ...Object.fromEntries(new FormData(formular)),
+            }),
+          });
+          const svar = await res.json();
+          if (!svar.ok) throw new Error('bad response');
+          formular.hidden = true;
+          tack.hidden = false;
+        } catch {
+          fel.hidden = false;
+          skicka.disabled = false;
+        }
+      });
+    </script>
   </body>
 </html>
+
+<style is:global>
+  :root {
+    --black: #000000;
+    --white: #efece3;
+    --dim: #9a978e;
+    --line: rgba(239, 236, 227, 0.35);
+    color-scheme: dark;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  [hidden] {
+    display: none !important;
+  }
+
+  html {
+    background: var(--black);
+    color: var(--white);
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    min-height: 100svh;
+    font-family: 'Newsreader', Georgia, 'Times New Roman', serif;
+    font-weight: 300;
+    font-size: 1.25rem;
+    line-height: 1.5;
+  }
+
+  /* Language: show only the active language */
+  html:not([data-lang='en']) .t[lang='en'],
+  html[data-lang='en'] .t[lang='sv'] {
+    display: none;
+  }
+
+  .sida {
+    min-height: 100vh;
+    min-height: 100svh;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    padding: 1.5rem clamp(1.25rem, 5vw, 3rem) 3rem;
+  }
+
+  .dold {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* Language switch */
+  .val {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1.5rem;
+  }
+
+  .val button {
+    font: inherit;
+    font-size: 1.05rem;
+    color: var(--dim);
+    background: none;
+    border: 0;
+    border-bottom: 1px solid transparent;
+    padding: 0.25rem 0;
+    cursor: pointer;
+  }
+
+  .val button:hover {
+    color: var(--white);
+  }
+
+  .val button[aria-pressed='true'] {
+    color: var(--white);
+    border-bottom-color: var(--white);
+  }
+
+  .val button:focus-visible {
+    outline: 1px solid var(--white);
+    outline-offset: 4px;
+  }
+
+  main {
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    row-gap: 3.5rem;
+    padding-top: 2rem;
+  }
+
+  .intro,
+  .formular,
+  .tack {
+    width: min(30rem, 100%);
+  }
+
+  .intro p {
+    margin: 0 0 1.25rem;
+  }
+
+  .intro p:last-child {
+    margin-bottom: 0;
+  }
+
+  .intro a {
+    color: var(--white);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+    overflow-wrap: anywhere;
+  }
+
+  .intro a:hover {
+    color: var(--dim);
+  }
+
+  .intro a:focus-visible {
+    outline: 1px solid var(--white);
+    outline-offset: 4px;
+  }
+
+  .formular label {
+    display: grid;
+    gap: 0.35rem;
+    margin-bottom: 2.25rem;
+  }
+
+  .etikett {
+    font-size: 1.05rem;
+    font-style: italic;
+    color: var(--dim);
+  }
+
+  .formular input,
+  .formular textarea {
+    font: inherit;
+    color: var(--white);
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    border-radius: 0;
+    padding: 0.4rem 0;
+    width: 100%;
+  }
+
+  .formular textarea {
+    resize: vertical;
+    min-height: 5.5rem;
+  }
+
+  .formular input:focus-visible,
+  .formular textarea:focus-visible {
+    outline: none;
+    border-bottom-color: var(--white);
+    box-shadow: 0 1px 0 var(--white);
+  }
+
+  /* Keep browser autofill from painting a coloured background */
+  .formular input:-webkit-autofill,
+  .formular textarea:-webkit-autofill {
+    -webkit-box-shadow: 0 0 0 100px var(--black) inset;
+    -webkit-text-fill-color: var(--white);
+    caret-color: var(--white);
+  }
+
+  .skicka {
+    width: 100%;
+    margin-top: 0.25rem;
+    padding: 0.9rem 1rem;
+    font: inherit;
+    color: var(--black);
+    background: var(--white);
+    border: 1px solid var(--white);
+    border-radius: 0;
+    cursor: pointer;
+  }
+
+  .skicka:hover,
+  .skicka:focus-visible {
+    color: var(--white);
+    background: transparent;
+  }
+
+  .skicka:focus-visible {
+    outline: 1px solid var(--white);
+    outline-offset: 4px;
+  }
+
+  .skicka:disabled {
+    opacity: 0.5;
+    cursor: wait;
+  }
+
+  .not {
+    margin: 1.25rem 0 0;
+    font-size: 0.95rem;
+    font-style: italic;
+    color: var(--dim);
+  }
+
+  .fel {
+    margin: 1rem 0 0;
+    color: var(--white);
+  }
+
+  .tack {
+    margin: 0;
+    font-size: 2rem;
+    font-weight: 300;
+  }
+</style>

@@ -1,0 +1,473 @@
+---
+// Save this as src/pages/medlem.astro  ->  the page is then at yourdomain.org/medlem
+// Edit the labels here. "namn" must match what skicka.mjs expects, so don't rename it.
+
+const falt = [
+  { namn: 'fullname', typ: 'text', auto: 'name', sv: 'Fullständigt namn', en: 'Full name' },
+  { namn: 'email', typ: 'email', auto: 'email', sv: 'E-post', en: 'Email' },
+  { namn: 'phone', typ: 'tel', auto: 'tel', sv: 'Telefonnummer', en: 'Phone number' },
+  {
+    namn: 'personnummer',
+    typ: 'text',
+    auto: 'off',
+    mode: 'numeric',
+    sv: 'Personnummer (ÅÅÅÅMMDD-XXXX)',
+    en: 'Personal identity number (YYYYMMDD-XXXX)',
+  },
+  { namn: 'street', typ: 'text', auto: 'street-address', sv: 'Gatuadress', en: 'Street address' },
+  { namn: 'postcode', typ: 'text', auto: 'postal-code', mode: 'numeric', sv: 'Postnummer', en: 'Postal code' },
+  { namn: 'city', typ: 'text', auto: 'address-level2', sv: 'Ort', en: 'City' },
+];
+
+// Error messages. "kod" matches the error codes sent back by skicka.mjs.
+const fel = [
+  { kod: 'password', sv: 'Fel lösenord.', en: 'Wrong password.' },
+  { kod: 'missing', sv: 'Fyll i alla fält.', en: 'Please fill in every field.' },
+  { kod: 'email', sv: 'Kontrollera e-postadressen.', en: 'Please check the email address.' },
+  { kod: 'phone', sv: 'Kontrollera telefonnumret.', en: 'Please check the phone number.' },
+  {
+    kod: 'personnummer',
+    sv: 'Kontrollera personnumret (ÅÅÅÅMMDD-XXXX).',
+    en: 'Please check the personal identity number (YYYYMMDD-XXXX).',
+  },
+  { kod: 'postcode', sv: 'Kontrollera postnumret (5 siffror).', en: 'Please check the postal code (5 digits).' },
+  { kod: 'server', sv: 'Något gick fel. Försök igen.', en: 'Something went wrong. Please try again.' },
+];
+
+const portFel = fel.filter((f) => f.kod === 'password' || f.kod === 'server');
+---
+
+<!doctype html>
+<html lang="sv" data-lang="sv">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Medlemmar</title>
+
+    <!-- Runs before the page is drawn, so the right language shows immediately (no flash). -->
+    <script is:inline>
+      (function () {
+        var lang = null;
+        try { lang = localStorage.getItem('lang'); } catch (e) {}
+        if (lang !== 'sv' && lang !== 'en') {
+          lang = (navigator.language || '').toLowerCase().indexOf('sv') === 0 ? 'sv' : 'en';
+        }
+        document.documentElement.setAttribute('data-lang', lang);
+        document.documentElement.lang = lang;
+      })();
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,300;0,400;1,300&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+
+  <body>
+    <div class="sida">
+      <nav class="topp" aria-label="Navigation">
+        <a class="hem" href="/">Thea Sofia</a>
+        <div class="val" role="group" aria-label="Språk / Language">
+          <button type="button" data-set="sv" lang="sv" aria-pressed="true">Svenska</button>
+          <button type="button" data-set="en" lang="en" aria-pressed="false">English</button>
+        </div>
+      </nav>
+
+      <main>
+        <h1 class="dold">
+          <span class="t" lang="sv">Medlemmar</span>
+          <span class="t" lang="en">Members</span>
+        </h1>
+
+        <!-- Step 1: password -->
+        <form id="port" class="formular">
+          <label>
+            <span class="etikett">
+              <span class="t" lang="sv">Lösenord</span>
+              <span class="t" lang="en">Password</span>
+            </span>
+            <input type="password" name="password" autocomplete="current-password" required />
+          </label>
+
+          <button type="submit" class="skicka">
+            <span class="t" lang="sv">Öppna</span>
+            <span class="t" lang="en">Open</span>
+          </button>
+
+          <div class="felbox" id="port-fel" role="alert">
+            {
+              portFel.map((f) => (
+                <p class="fel" data-fel={f.kod} hidden>
+                  <span class="t" lang="sv">{f.sv}</span>
+                  <span class="t" lang="en">{f.en}</span>
+                </p>
+              ))
+            }
+          </div>
+        </form>
+
+        <!-- Step 2: member form (hidden until the server accepts the password) -->
+        <form id="medlem" class="formular" hidden>
+          <p class="dold" aria-hidden="true">
+            <label>Do not fill in: <input name="website" tabindex="-1" autocomplete="off" /></label>
+          </p>
+
+          {
+            falt.map((f) => (
+              <label>
+                <span class="etikett">
+                  <span class="t" lang="sv">{f.sv}</span>
+                  <span class="t" lang="en">{f.en}</span>
+                </span>
+                <input
+                  type={f.typ}
+                  name={f.namn}
+                  autocomplete={f.auto}
+                  inputmode={f.mode}
+                  required
+                />
+              </label>
+            ))
+          }
+
+          <button type="submit" class="skicka">
+            <span class="t" lang="sv">Skicka</span>
+            <span class="t" lang="en">Send</span>
+          </button>
+
+          <p class="not">
+            <span class="t" lang="sv">Uppgifterna används endast för medlemsadministration i Thea Sofia.</span>
+            <span class="t" lang="en">Your details are used only for membership administration in Thea Sofia.</span>
+          </p>
+
+          <div class="felbox" id="medlem-fel" role="alert">
+            {
+              fel.map((f) => (
+                <p class="fel" data-fel={f.kod} hidden>
+                  <span class="t" lang="sv">{f.sv}</span>
+                  <span class="t" lang="en">{f.en}</span>
+                </p>
+              ))
+            }
+          </div>
+        </form>
+
+        <p class="tack" id="tack" role="status" hidden>
+          <span class="t" lang="sv">Tack.</span>
+          <span class="t" lang="en">Thank you.</span>
+        </p>
+      </main>
+    </div>
+
+    <script>
+      type Lang = 'sv' | 'en';
+
+      const root = document.documentElement;
+      const knappar = document.querySelectorAll<HTMLButtonElement>('[data-set]');
+
+      function visa(lang: Lang) {
+        root.setAttribute('data-lang', lang);
+        root.lang = lang;
+        document.title = lang === 'sv' ? 'Medlemmar' : 'Members';
+        knappar.forEach((k) => k.setAttribute('aria-pressed', String(k.dataset.set === lang)));
+      }
+
+      knappar.forEach((k) =>
+        k.addEventListener('click', () => {
+          const lang = k.dataset.set as Lang;
+          visa(lang);
+          try { localStorage.setItem('lang', lang); } catch {}
+        })
+      );
+
+      visa(root.getAttribute('data-lang') === 'en' ? 'en' : 'sv');
+
+      // ---- Password gate and member form ----
+      const port = document.querySelector<HTMLFormElement>('#port')!;
+      const medlem = document.querySelector<HTMLFormElement>('#medlem')!;
+      const tack = document.querySelector<HTMLElement>('#tack')!;
+      const portFel = document.querySelector<HTMLElement>('#port-fel')!;
+      const medlemFel = document.querySelector<HTMLElement>('#medlem-fel')!;
+
+      // The password is kept in memory only. It is never saved in the browser.
+      let losenord = '';
+
+      function visaFel(box: HTMLElement, kod: string | null) {
+        const finns = kod !== null && box.querySelector(`[data-fel="${kod}"]`) !== null;
+        const valt = finns ? kod : kod === null ? null : 'server';
+        box.querySelectorAll<HTMLElement>('[data-fel]').forEach((p) => {
+          p.hidden = p.dataset.fel !== valt;
+        });
+      }
+
+      async function skicka(payload: Record<string, unknown>) {
+        try {
+          const res = await fetch('/.netlify/functions/skicka', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          return await res.json();
+        } catch {
+          return { ok: false, error: 'server' };
+        }
+      }
+
+      port.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const knapp = port.querySelector<HTMLButtonElement>('.skicka')!;
+        knapp.disabled = true;
+        visaFel(portFel, null);
+
+        const pw = String(new FormData(port).get('password') ?? '');
+        const svar = await skicka({ kind: 'losenord', password: pw });
+        knapp.disabled = false;
+
+        if (svar.ok) {
+          losenord = pw;
+          port.hidden = true;
+          medlem.hidden = false;
+          medlem.querySelector<HTMLInputElement>('input:not([name="website"])')?.focus();
+        } else {
+          visaFel(portFel, svar.error ?? 'server');
+        }
+      });
+
+      medlem.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const knapp = medlem.querySelector<HTMLButtonElement>('.skicka')!;
+        knapp.disabled = true;
+        visaFel(medlemFel, null);
+
+        const svar = await skicka({
+          kind: 'medlem',
+          password: losenord,
+          ...Object.fromEntries(new FormData(medlem)),
+        });
+
+        if (svar.ok) {
+          losenord = '';
+          medlem.hidden = true;
+          tack.hidden = false;
+        } else if (svar.error === 'password') {
+          // The password was changed or is no longer accepted: back to the gate.
+          losenord = '';
+          medlem.hidden = true;
+          port.hidden = false;
+          visaFel(portFel, 'password');
+        } else {
+          knapp.disabled = false;
+          visaFel(medlemFel, svar.error ?? 'server');
+        }
+      });
+    </script>
+  </body>
+</html>
+
+<style is:global>
+  :root {
+    --black: #000000;
+    --white: #efece3;
+    --dim: #9a978e;
+    --line: rgba(239, 236, 227, 0.35);
+    color-scheme: dark;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  [hidden] {
+    display: none !important;
+  }
+
+  html {
+    background: var(--black);
+    color: var(--white);
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    min-height: 100svh;
+    font-family: 'Newsreader', Georgia, 'Times New Roman', serif;
+    font-weight: 300;
+    font-size: 1.25rem;
+    line-height: 1.5;
+  }
+
+  /* Language: show only the active language */
+  html:not([data-lang='en']) .t[lang='en'],
+  html[data-lang='en'] .t[lang='sv'] {
+    display: none;
+  }
+
+  .sida {
+    min-height: 100vh;
+    min-height: 100svh;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    padding: 1.5rem clamp(1.25rem, 5vw, 3rem) 3rem;
+  }
+
+  .dold {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* Top bar: name on the left, language switch on the right */
+  .topp {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1.5rem;
+  }
+
+  .hem {
+    color: var(--white);
+    text-decoration: none;
+    font-size: 1.05rem;
+  }
+
+  .hem:hover {
+    color: var(--dim);
+  }
+
+  .hem:focus-visible,
+  .val button:focus-visible {
+    outline: 1px solid var(--white);
+    outline-offset: 4px;
+  }
+
+  .val {
+    display: flex;
+    gap: 1.5rem;
+  }
+
+  .val button {
+    font: inherit;
+    font-size: 1.05rem;
+    color: var(--dim);
+    background: none;
+    border: 0;
+    border-bottom: 1px solid transparent;
+    padding: 0.25rem 0;
+    cursor: pointer;
+  }
+
+  .val button:hover {
+    color: var(--white);
+  }
+
+  .val button[aria-pressed='true'] {
+    color: var(--white);
+    border-bottom-color: var(--white);
+  }
+
+  main {
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    padding-top: 2rem;
+  }
+
+  .formular,
+  .tack {
+    width: min(30rem, 100%);
+  }
+
+  .formular label {
+    display: grid;
+    gap: 0.35rem;
+    margin-bottom: 2.25rem;
+  }
+
+  .etikett {
+    font-size: 1.05rem;
+    font-style: italic;
+    color: var(--dim);
+  }
+
+  .formular input {
+    font: inherit;
+    color: var(--white);
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    border-radius: 0;
+    padding: 0.4rem 0;
+    width: 100%;
+  }
+
+  .formular input:focus-visible {
+    outline: none;
+    border-bottom-color: var(--white);
+    box-shadow: 0 1px 0 var(--white);
+  }
+
+  /* Keep browser autofill from painting a coloured background */
+  .formular input:-webkit-autofill {
+    -webkit-box-shadow: 0 0 0 100px var(--black) inset;
+    -webkit-text-fill-color: var(--white);
+    caret-color: var(--white);
+  }
+
+  .skicka {
+    width: 100%;
+    margin-top: 0.25rem;
+    padding: 0.9rem 1rem;
+    font: inherit;
+    color: var(--black);
+    background: var(--white);
+    border: 1px solid var(--white);
+    border-radius: 0;
+    cursor: pointer;
+  }
+
+  .skicka:hover,
+  .skicka:focus-visible {
+    color: var(--white);
+    background: transparent;
+  }
+
+  .skicka:focus-visible {
+    outline: 1px solid var(--white);
+    outline-offset: 4px;
+  }
+
+  .skicka:disabled {
+    opacity: 0.5;
+    cursor: wait;
+  }
+
+  .not {
+    margin: 1.25rem 0 0;
+    font-size: 0.95rem;
+    font-style: italic;
+    color: var(--dim);
+  }
+
+  .fel {
+    margin: 1rem 0 0;
+    color: var(--white);
+  }
+
+  .tack {
+    margin: 0;
+    font-size: 2rem;
+    font-weight: 300;
+  }
+</style>
